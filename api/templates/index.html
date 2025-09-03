@@ -1,0 +1,11 @@
+{% load static %}
+<form method="post" enctype="multipart/form-data" action="{% url 'upload-satellite' %}">
+    {% csrf_token %}
+    <input type="file" name="file" accept="image/*,video/*">
+    <button type="submit">업로드</button>
+</form>
+
+{% if uploaded_url %}
+<p>{{ message }}</p>
+<a href="{{ uploaded_url }}" target="_blank">업로드 파일 보기</a>
+{% endif %}
