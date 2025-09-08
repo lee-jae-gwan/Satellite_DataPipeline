@@ -9,10 +9,19 @@ import json
 import uuid
 from django.views.decorators.csrf import csrf_exempt
 
+
 from django.http import JsonResponse
 from minio import Minio
 from datetime import timedelta
 from minio.error import S3Error
+import urllib
+
+from collections import defaultdict
+
+producer = KafkaProducer(
+    bootstrap_servers = '127.0.0.1:9092',
+    value_serializer = lambda v : json.dumps(v).encode('utf-8')
+)
 
 # Create your views here.
 class UploadSatelliteImage(APIView):
@@ -118,3 +127,31 @@ def upload_status(request):
 
         return JsonResponse({"Message": "status received"})
     return JsonResponse({"error": "POST 요청만 허용"}, status = 400)
+
+
+@csrf_exempt
+def minio_event(request):
+    if request.method=="POST":
+        try:
+            events = json.loads(request.body)
+            uuid_dict = defaultdict(list)
+
+            for record in events.get("Records",[]):
+                key = record['S3']['object']['key']
+                decode_key = urllib.parse.unquote(key)
+
+                folder_uuid = decode_key.split('/')[0]
+
+                uuid_dict[folder_uuid].append(record)
+            
+            for uuid, records in uuid_dict.items():
+                message = {'uuid':uuid, 'files':records}
+                producer.send("satellite_topic",key = uuid.encode('utf-8'), value = message)
+
+            producer.flush()
+            return JsonResponse({'stataus':'OK'})
+        
+        except Exception as e:
+            return JsonResponse({'status':'error', 'message':str(e)}, status=500)
+    
+    return JsonResponse({'status':'method not allowed'}, status =405)

@@ -76,6 +76,16 @@ async function uploadFile() {
             });
             console.log(`${fileData.file_name} 업로드 완료`);
         }
+
+        await fetch("/minio_event/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ Records: data.files.map(f => ({
+                S3: { object: { key: f.object_name } }
+            })) })
+        });
+
+        console.log("UUID 단위 이벤트 Kafka 전송 완료")
     }
 </script>
 
